@@ -103,22 +103,17 @@ sub replace_cmd
 	my $decoded_text;
 	eval {
 		$decoded_text = $text;
-		$decoded_text = Encode::decode('shiftjis', $decoded_text, Encode::FB_CROAK);
+		$decoded_text = Encode::decode('cp932', $decoded_text, Encode::FB_CROAK);
 	};
 
 	if ($@) {
 		# エラーの場合、文字参照で置換
-		$decoded_text = Encode::decode('shiftjis', $text, Encode::FB_PERLQQ);
+		$decoded_text = Encode::decode('cp932', $text, Encode::FB_PERLQQ);
 
-		# 異体字セレクタが含まれていない場合はそのまま返す
-		if ($decoded_text !~ /\\xFC\\xFC/) {
-			return $text;
-		}
-
-		# 0xFC, 0xFCを置換
-		$decoded_text =~ s/(\\xFC\\xFC)+/$replacement_str/g;
+		# 0xFCを置換
+		$decoded_text =~ s/(\\xFC)+/$replacement_str/g;
 		
-		return Encode::encode('shiftjis', $decoded_text);
+		return Encode::encode('cp932', $decoded_text);
 	}
 
 	# 無効なバイトシーケンスがなければそのまま返す
