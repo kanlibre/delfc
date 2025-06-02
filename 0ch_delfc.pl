@@ -38,7 +38,13 @@ sub getType
 #------------------------------------------------------------------------------------------------------------
 sub getConfig
 {
-	return {};
+	return {
+		'is_replace_vs16' => {
+			'default' => 1,
+			'valuetype' => 3,
+			'description' => '異体字セレクタと思われるバイト列をVS-16(U+FE0F)で置換します。',
+		}
+	};
 }
 
 #------------------------------------------------------------------------------------------------------------
@@ -58,25 +64,27 @@ sub execute
 	my $mail = $Form->Get('MAIL');
 	my $tt = $Form->Get('subject');
 
+	my $replacement_str = $this->GetConf('is_replace_vs16') ? '&#65039;' : '';
+
 	# 本文
-	$msg = replace_cmd($msg);
+	$msg = replace_cmd($msg, $replacement_str);
 	$Form->Set('MESSAGE', $msg);
 
 	# 名前欄
 	if ($name ne '') {
-		$name = replace_cmd($name);
+		$name = replace_cmd($name, $replacement_str);
 		$Form->Set('FROM', $name);
 	}
 
 	# メール欄
 	if ($mail ne '') {
-		$name = replace_cmd($mail);
+		$name = replace_cmd($mail, '');
 		$Form->Set('MAIL', $mail);
 	}
 	
 	# スレタイ
 	if ($tt ne '') {
-		$tt = replace_cmd($tt);
+		$tt = replace_cmd($tt, $replacement_str);
 		$Form->Set('subject', $tt);
 	}
 	
@@ -89,22 +97,23 @@ sub execute
 sub replace_cmd
 {
 	my $text = shift;
+	my $replacement_str = shift;
 
 	# 無効なバイトシーケンスが含まれているかチェック
 	my $decoded_text;
 	eval {
 		$decoded_text = $text;
-		$decoded_text = Encode::decode('shiftjis', $decoded_text, Encode::FB_CROAK);
+		$decoded_text = Encode::decode('cp932', $decoded_text, Encode::FB_CROAK);
 	};
 
 	if ($@) {
-		# エラーの場合、U+FFFD を挿入してデコード
-		$decoded_text = Encode::decode('shiftjis', $text, Encode::FB_DEFAULT);
+		# エラーの場合、文字参照で置換
+		$decoded_text = Encode::decode('cp932', $text, Encode::FB_PERLQQ);
 
-		# U+FFFD (不正な文字を表す置換文字) を除去
-		$decoded_text =~ s/\x{FFFD}//g;
+		# 0xFCを置換
+		$decoded_text =~ s/(\\xFC)+/$replacement_str/g;
 		
-		return Encode::encode('shiftjis', $decoded_text);
+		return Encode::encode('cp932', $decoded_text);
 	}
 
 	# 無効なバイトシーケンスがなければそのまま返す
